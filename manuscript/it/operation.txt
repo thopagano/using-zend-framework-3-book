@@ -1,0 +1,1301 @@
+# Funzionamento del sito web {#operation}
+
+In questo capito forniremo un po di teoria su come lavora una tipica applicazione basata su Zend Framework 3.
+Imparerai alcuni elementi basi del PHP quali le classi, il modo in cui sono usati i namespace PHP per evitare il conflitto di nomi, cosa è l'autoloading di una classe, come definire i parametri di configurazione di una applicazione e le fasi del ciclo di vita di una applicazione. Avrai modo di familiarizzarena anche con alcuni importanti componenenti di ZF3 come @`Zend\EventManager`, @`Zend\ModuleManager` e @`Zend\ServiceManager`.
+Se invece di imparare la teoria, vuoi qualche esempio pratico, salta questo capitolo e vai direttamente a [Model-View-Controller](#mvc).
+
+I componenti ZF3 trattati in questo capitolo sono:
+
+|--------------------------------|---------------------------------------------------------------|
+| *Componente*                   | *Descrizione*                                                 |
+|--------------------------------|---------------------------------------------------------------|
+| @`Zend\Mvc`                    | Supporto del modello Model-View-Controller pattern.           |
+|                                | Separazione dalla logica di business dalla presentazione      |
+|--------------------------------|---------------------------------------------------------------|
+| @`Zend\ModuleManager`          | Questo componenente è responsabile del caricamente e          |
+|                                | dell'inizializzazione dei moduli dell'applicazione web.       |
+|--------------------------------|---------------------------------------------------------------|
+| @`Zend\EventManager`           | Questo componenete implementa le funzionalità per innescare   |
+|                                | gli eventi e per la loro gestione.                            |
+|--------------------------------|---------------------------------------------------------------|
+| @`Zend\ServiceManager`         | Implementa il registro di tutti i servizi disponibili nella   |
+|                                | applicazione web.                                             |
+|--------------------------------|---------------------------------------------------------------|
+
+## Classi PHP
+
+PHP supporto la programmazione orientato agli oggetti (OOP). Nella OOP, l'elemento principale del tuo codice è la *classe*. Una classe ha *proprietà* e *metodi*. Ad esempio, creiamo uno script in PHP chiamandolo *Person.php* e definiamo in questo file una semplice classe denominata `Person`:
+
+{line-numbers=off,lang="php"}
+~~~
+<?php 
+
+class Person
+{
+    private $fullName;
+    
+    public function __construct()
+    {
+        // Some initialization code.
+        $this->fullName = 'Unknown person';
+    }
+    
+    public function getFullName()
+    {
+        return $this->fullName;
+    }
+    
+    public function setFullName($fullName)
+    {
+        $this->fullName = $fullName;
+    }
+}
+~~~   
+
+I> Noterai che nell'esempio sopra riportato apriamo con il tag `<?php` che dice al motore PHP che il testo che segue
+I> questo tag è codice PHP. Nell'esempio precedente, quando il file contiene solo codice PHP (senza mischiare PHP con tag 
+I> HTML), non hai la necessità di inserire il tag di chiusura `?>` dopo la fine del codice. Inoltre, non è raccomandato e 
+I> può causare effetti indesiderati, se inavvertitamente aggiungi alcuni caratteri dopo il tag di chiususa `?>`. 
+ 
+La precedente classe `Person` ha una proprietà privata `$fullName` e tre metodi:  
+
+  * il metodo `__construct()` è un metodo speciale chiamato *costruttore*. E' usato se hai la necessità di inizializzare le proprietà della classe.
+  
+  *  `getFullName()` e `setFullName()` sono metodo pubblici usati per fare qualcosa nella classe.
+
+Una volta definita la classe, puoi creare *oggetti* di quella classe con l'operatore `new`, come segue:
+
+{line-numbers=off,lang="php"}
+~~~
+<?php 
+
+// Instantiate the Person.
+$person = new Person();
+
+// Set full name.
+$person->setFullName('John Doe');
+
+// Print person's full name to screen.
+echo "Person's full name is: " . $person->getFullName() . "\n";
+~~~
+
+I> Le classi permettono di scomporre le funzionalità in piccoli blocchi dando un'organizzazione migliore. 
+I> ZF3 ha centinaia di classi.
+I> Scriverai anche tu le tue classi nella tua applicazione web.
+ 
+## I namespace di PHP
+
+Quando usi classi di librerie differenti (o magari classi di diversi componenti di una singola libreria) nel tuo programma, i nomi delle classi possono essere in conflitto.
+Questo significa che puoi avere due classi che hanno lo stesso nome, generando un errore nell'interprete PHP. 
+
+Se ha programmato siti web con Zend Framework 1, potrai ricordera quei nomi di classi *extra* lunghi come `Zend_Controller_Abstract`. L'idea dei nomi lunghi era utilizzato per evitare conflitti di nomi tra diversi componenti.
+Ogni componente definisce il suo prefisso, come `Zend_` o `My_`.  
+
+Per raggiungere lo stesso obiettivo, Zend Framework 3 utilizza una funzione di linguaggio PHP chiamata *namespace*.
+I namespace consentono di risolvere le collisioni di nome tra i componenti del codice e forniscono all'utente la
+possibilità di abbreviare i nomi lunghi.
+
+Un namespace è un contenitore per un gruppo di nomi. È possibile nidificare i namespace in un altro.
+
+Se una classe non definisce un namespace, sarà posizionato all'interno di un namespace *globale* (ad esempio, le classi PHP `Exception` e `DateTime` appartengo al namespace globale).
+
+Di seguito viene presentato un esempio reale di una definizione di namespace (preso dal componente @`Zend\Mvc`):  
+
+{line-numbers=on,lang="php"}
+~~~
+<?php
+namespace Zend\Mvc;
+
+/**
+ * Main application class for invoking applications.
+ */
+class Application 
+{
+    // ... class members were omitted for simplicity ...
+}
+~~~
+
+In Zend Framework 3, tutte le classi apparengono al namespace di livello superiore *Zend*.
+La riga 2 definisce il namespce *Mvc*, che è nidificata nel namespace *Zend*, e tutte le classi di questo componenete (inclusa la classe @`Application`[Zend\Mvc\Application] mostrata in questo esempio nelle righe 7-10) appartengono a questo namespace. Separi la nidificazione dei nomi dei namespace con il carattere back-slash ('\\').
+
+In altre parti del codice, fai riferimento alla classe @`Application`[Zend\Mvc\Application] usando il suo nome completo:
+  
+{line-numbers=off,lang="php"}
+~~~
+<?php
+$application = new \Zend\Mvc\Application();
+~~~
+
+I> Notare il back-slash iniziale nel nome @`\Zend\Mvc\Application`. Se specifichi un nome di classe con il back-slah iniziale, stai indicando il nome completo della classe. E' anche possibile specificare nomi di classi relativi al namespace corrente, in questo caso non specificare il back-slash iniziale.
+
+E' possibile, inoltre, usare un *alias* (nome breve per la classe) con l'aiuto dell'istruzione `use` di PHP.
+ 
+{line-numbers=off,lang="php"}
+~~~
+<?php
+// Define the alias in the beginning of the file.
+use Zend\Mvc\Application;
+
+// Later in your code, use the short class name.
+$application = new Application();
+~~~
+
+T> Sebbene l'alias consenta di utilizzare un nome di classe breve anziché il nome completo, il suo utilizzo 
+T> è facoltativo. Non è necessario utilizzare sempre gli alias e può fare riferimento alla classe tramite 
+T> il suo nome completo.
+
+Ogni file PHP dell'applicazione definisce tipicamente lo spazio dei nomi (eccetto lo script di accesso *index.php* e i file di configurazione, che in genere non lo fanno). 
+Ad esempio, il modulo principale del tuo sito, il modulo *Application*, definisce il proprio spazio dei nomi il cui nome è uguale al nome del modulo:
+
+{line-numbers=off,lang="php"}
+~~~
+<?php
+namespace Application;
+
+class Module 
+{
+    // ... class members were omitted for simplicity ...
+}
+~~~
+
+## Le interfacci PHP
+
+In PHP, le *interfacce* permettono di definire quale comportamento dovrebbe avere una classe, ma senza fornire l'implementazione di questo comportamento. Viene anche chiamato *contratto*: implementando un'interfaccia, una classe accetta le condizioni contrattuali.
+
+In Zend Framework 3, le interfacce sono ampiamente utilizzate. Per esempio, la classe @`Application` implementa @`ApplicationInterface`, che definisce i metodi che ogni classe dell'applicazione deve fornire:
+
+{line-numbers=off,lang="php"}
+~~~
+<?php 
+namespace Zend\Mvc;
+
+interface ApplicationInterface
+{
+    // Retrieves the service manager.
+    public function getServiceManager();
+
+    // Retrieves the HTTP request object.
+    public function getRequest();
+
+    // Retrieves the HTTP response object.
+    public function getResponse();
+
+    // Runs the application.
+    public function run();
+}
+~~~
+
+Come si può vedere dall'esempio precedente, un interfaccia è definita utilizzando la parola chiave `interface`, quasi nello stesso modo in cui definisci una classe PHP standard. Come una normale classe, l'interfaccia definisce metodi. Tuttavia, l'interfaccia non fornisce alcuna implementazione
+dei suoi metodi. Nella definizione dell'interfaccia @`ApplicationInterface` qui sopra, si può
+vedere che ogni applicazione che implementa questa interfaccia avrà il metodo `getServiceManager ()` per
+richiamare il gestore dei servizi (sul gestore dei servizi, vedremo più avanti in questo capitolo), i metodi `getRequest ()` e `getResponse ()` per recuperare la richiesta HTTP e la risposta, rispettivamente,
+e metodo `run ()` per eseguire l'applicazione.
+
+I> In Zend Framework 3, per convenzione, le classi interfracce dovrebbero essere nomitate con il suffico `Interface` come @`ApplicationInterface`.
+
+Una classe che implementa un interfaccia viene chiamata classe *concreta*. La classe concreta @`Application` implementa la @`ApplicationInterface`, il che significa che fornisce l'implementazione dei metodi definiti nell'interfaccia:   
+
+{line-numbers=off,lang="php"}
+~~~
+<?php 
+namespace Zend\Mvc;
+
+class Application implements ApplicationInterface
+{
+    // Implement the interface's methods here
+   
+    public function getServiceManager() 
+    {
+        // Provide some implementation...
+    }
+
+    public function getRequest() 
+    {
+        // Provide some implementation...
+    }
+
+    public function getResponse() 
+    {
+        // Provide some implementation...
+    }
+
+    public function run() 
+    {
+        // Provide some implementation...
+    }
+}
+~~~ 
+
+La classe concreta @`Application` usa la parola chiave `implements` per indicare che fornisce un implementazione di tutti i metodi dell'interfaccia `ApplicationInterface`.
+La classe @`Application` può anche avere ulteriori metodi, i quali sono sono parte dell'interfaccia.
+
+Graficamente, le relazioni della classse sono visualizzate utilizzando i diagrammi dell'ereditarietà.
+In figura 3.1, è rappresentato il diagramma per la classe @`Application`. La freccia punta dalla classe figlio alla classe genitore.
+
+ 
+![Figura 3.1. Diagramma della classe Application](images/operation/Application.png)
+	
+## Autoloading della classe in PHP
+
+Una applicazione web consiste di diverse classi PHP, e ogni classe risiede normalmente in un file separato. Questo introduce la necessità di *includere* i file.
+
+Per esempio, assumiamo di avere il file denominato *Application.php* il quale contiene la definizione per la classe @`\Zend\Mvc\Application` della precedente sezione. Prima di poter creare una istanza della classe @`Application` da qualche parte nel codice, occorre includere il contenuto del file *Application.php* (puoi farlo con l'aiuto dell'istruzione `require_once`, passandogli il percorso completo al file):
+
+{line-numbers=off,lang="php"}
+~~~
+<?php
+require_once "/path/to/zendframework/zend-mvc/src/Application.php";
+
+use Zend\Mvc\Application;
+
+$application = new Application();
+~~~
+
+Man mano che la tua applicazione cresce di dimensioni, potrebbe essere difficile includere ogni file necessario. Zend Framework 3 stesso è costituito da centinaia di file, e può essere molto difficile caricare l'intera libreria e tutto il suo dipendenze in questo modo. Inoltre, quando si esegue il codice risultante, l'interprete PHP impiegherà la CPU per elaborare ogni file incluso, anche se non si crea un'istanza della sua classe.
+
+Per risolvere questo problema, in PHP, è stata introdotta la funzionalità di autoloading della classe. La funzione `spl_autoload_register()` consente di registrare una funzione *autoloader*. Per siti web complessi, puoi persino creare diverse funzioni dell'autoloader, che sono incatenate in una pila.
+
+Durante l'esecuzione dello script, se l'interprete PHP incontra un nome di classe che non è stato ancora definito, chiama a turno tutte le funzioni registrate dall'autoloader, finché la funzione di autoloader  include la classe o viene generato l'errore "non trovato". Ciò consente il caricamento "pigro", ossia l'interprete PHP elabora la definizione della classe solo quando è veramente necessario.
+
+### Autoloader per mappe di classi
+
+Per dare un'idea di come funziona l'autoloader, diamo di seguito una implementazione semplificata della funzione di autocaricamento:
+
+{line-numbers=off,lang="php"}
+~~~
+<?php
+// Autoloader function.
+function autoloadFunc($className) 
+{
+    // Class map static array.
+    static $classMap = [
+        '\\Zend\\Mvc\\Application' => '/path/to/zendframework/zend-mvc/src/Zend/Mvc/Application.php',
+        '\\Application\\Module' => '/path/to/app/dir/module/Application/Module.php',
+        //...
+    ];
+
+    // Check if such a class name presents in the class map.
+    if(isset(static::$classMap[$className])) {
+        $fileName = static::$classMap[$className];
+  
+        // Check if file exists and is readable.
+        if (is_readable($fileName)) {
+            // Include the file.
+            require $fileName;
+        }
+    }
+}
+
+// Register our autoloader function.
+spl_autoload_register("autoloadFunc");
+~~~
+
+Nell'esempio precedente, definiamo la funzione autoloader `autoloadFunc()` alla quale ci riferiremo come l'autoloader *mappa delle classi*.
+
+L'autoloader mappa delle classi usa la mappa per associare il nome della classe e il percorso assoluto al file PHP che contiene quella classe. La mappa delle classi è un normale array PHP contenente chiavi e valori. Per determinare il percorso del file dal nome della classe, l'autoloader mappa delle classi deve recuperare il valore dall'array delle mappa delle classi. E' ovvio che l'autoloader mappa delle classi lavora molto velocemente. Lo svantaggio è che occorre mantenere la mppa delle classi ed aggiornarla ogni volta che si aggiunge una nuoca classe al programma.
+
+### PSR-4 Standard
+
+Poiché i fornitori di librerie utilizzano le proprie convenzioni per la nominare il codice e organizzazione file, occorre registrare una funzione personalizzata di autoloader diversa per ogni dipendenza di libreria, il che è piuttosto fastidioso (e in realtà questo lavoro non è necessario). Per risolvere questo problema, è stato introdotto lo standard PSR-4.
+
+I> PSR è l'acronimo di PHP Standards Recommendation.
+
+Lo [standard PSR-4](http://www.php-fig.org/psr/psr-4/) definisce la struttura del codice consigliata che una applicazione o una libreria deve segure per garantire interoperabilità dell'autoloader. IN due parole, lo standard dice questo:
+
+* Lo spazio dei nomi (namespace) delle classi devono essere organizzati nel seguente modo:
+  `\<Vendor Name>\(<Namespace>)*\<Class Name>`
+
+* I namespace possono avere tanti livelli di nidificazione quanto si vuole ma il *Nome del fornitore* deve essere nel livello principale del namespace.
+
+* I namespace devono essere associati alla struttura delle directory. Ogni separatore di namespace ('\\') è convertito in una una costante di sistema operativo `DIRECTORY_SEPARATOR` durante il caricamento del file system.
+
+* I nomi delle classi hanno come suffisso l'estensione *.php* quando vengono caricati dal file system.
+
+Per esempiom per la classe @`Zend\Mvc\Application`, avremo la seguente struttura di directory:
+
+{line-numbers=off,lang="text"}
+~~~
+/path/to/zendframework/zend-mvc/src
+  /Zend
+    /Mvc
+       Application.php
+~~~
+
+Lo svantagio è che sarà necessario inserire il codice in directory multiple e nidificate (*Zend* e *Mvc*). 
+
+Per correggere questo aspetto, il PSR-4 permette di definire che ad una serie continua di namespace principali o di sub-namespace corrispondano un "directory di base".
+Per esempio, se abbiamo @`\Zend\Mvc\Application` come nome di classe completo, e se definiamo che la serie @`\Zend\Mvc` corrisponda alla directory "/path/to/zendframework/zend-mvc/src", possiamo organizzare i file come segue:
+
+```
+/path/to/zendframework/zend-mvc/src
+    Application.php
+```
+
+Per la codifica conforme allo standard PSR-4, possiamo scrivere e registrare un autoloader, al quale faremo riferimento come l'autoloader "standard": 
+
+{line-numbers=off,lang="php"}
+~~~
+<?php
+
+// "Standard" autoloader function.
+function standardAutoloadFunc($className) 
+{
+    // Replace the namespace prefix with base directory.
+    $prefix = '\\Zend\\Mvc';
+    $baseDir = '/path/to/zendframework/zend-mvc/src/';
+    if (substr($className, 0, strlen($prefix)) == $prefix) {
+        $className = substr($className, strlen($prefix)+1);
+        $className = $baseDir . $className;
+    }
+
+    // Replace namespace separators in class name with directory separators.
+    $className = str_replace('\\', DIRECTORY_SEPARATOR, $className);
+  
+    // Add the .php extension.
+    $fileName = $className . ".php";
+  
+    // Check if file exists and is readable.
+    if (is_readable($fileName)) {
+        // Include the file.
+        require $fileName;
+    } 
+}
+
+// Register the autoloader function.
+spl_autoload_register("standardAutoloadFunc");
+~~~
+
+L'autoloader standard lavora come di seguito descritto. Assumendo che il namespace della classe possa essere associato alla struttura di directory con una corrispondenza uno ad uno, la funzione determina il percorso del file PHP trasformando i back-slash (separatori dei namespace) in forward slash (separatori di percorso) e concatena il percorso ottenuto con il percorso assoluto alla directory in cui si trova la libreria. Quindi la funzione controlla se esiste qualche file PHP, e se esiste, lo include con l'istruzione `require`.
+ 
+E' ovvio, che l'autoloader standard lavoro lentamente rispetto all'autoloader mappa per le classi.
+
+Quindi il suo vantaggio è che non è necessario gestire nessuna mappa di classi, il che è molto conveniente quando si sviluppa codice nuovo e si aggiungono nuove classi all'applicazione.
+
+I> Zend Framwork 3 è conforme allo standard PSR-4, rendendo possibile l'uso del meccanismo dell'autoloader standar su tutti i suoi componenti. E' anche compatibile con altre libreie conformi a PSR-4 come Doctrine e Symfony.
+
+### Autoloader fornito da Composer
+
+Composer può generare le funzioni di autoloader (sia l'autoloader per mappe di class sia l'autoloader standard SPR-4) per il codice che installi con esso.
+
+Zend Framework 3 usa l'implementazione dell'autoloader fornito da Composer. Quando installi il pacchetto con Composer, quest'ultimo crea automaticamente il file *APP_DIR/vendor/autoload.php*, il quale usa la funzione PHP `spl_autoload_register()` per registrare un autoloader. In questo modo tutte le classi posizionate nella cartella `APP_DIR/vendor` saranno correttamente auto-caricate. 
+
+Per auto-caricare le classi PHP posizionate nel nostro modulo (come il modulo `Application`) occorre specificare la chiave `autoload`  nel file `composer.json`:   
+
+{line-numbers=off,lang="json",title="Autoload key of composer.json file"}
+~~~
+"autoload": {
+    "psr-4": {
+        "Application\\": "module/Application/src/"
+    }
+},
+~~~
+
+Quindi l'unica cosa da fare è includere quel file nello script di accesso al tuo sito web `index.php`:
+
+{line-numbers=off,lang="php"}
+```
+// Composer autoloading
+include __DIR__ . '/../vendor/autoload.php';
+```
+
+T> Il file *autoload.php* viene generato ogni volta che installi un pacchetto con Composer. Inoltre, per fare in modo che Composer generi il file *autoload.php*, occorre eseguire il comando `dump-autoload`: 
+T> 
+T> `php composer.phar dump-autoload`
+
+### PSR-4 e la struttura della directory di origine del modulo
+
+Nell'applicazione Zend Skeleton, è possibile vedere come lo standard PSR-4 è stato applicato in pratica. Per il modulo predefinito del tuo sito web, il modulo `Application`,  le classi PHP che sono registrate nell'autoloader standard sono memorizzate nella directory `APP_DIR/module/Application/src` ("src" l'abbreviazione significa "sorgenti").
+
+I> Faremo riferimento alla directory `src` come la directory dei sorgenti dei moduli.
+
+Per esempio, vediamo nel file `IndexController.php` del modulo `Application` (figura 3.2).
+
+![Figura 3.2. Struttura di directory dell'applicazione Skeleton conforme allo standard PSR-4](images/operation/psr0_and_dir_structure.png)
+
+Come puoi vedere, contiene la classe[^controller] `IndexController`appartenente al namespace `Application\Controller`.
+Per essere abilitato a seguire lo standard PSR-4 e usare l'autoloader standard cib questa classe PHP, metteremo nella directory `Controller` sotto la directory dei sorgenti dei moduli. 
+
+[^controller]: la classe `IndexController` è il controllore predefinito per il sito web skeleton. Parleremo dei controllori più avanti nel capito [Model-View-Controller](#mvc). 
+ 
+## Richiesta e risposta HTTP
+
+Quando un utente apre una pagina web di un sito nella finestra del browser web, il browser genera un messaggio e lo manda utilizzando il protocollo HTTP al server web. Il server web dirotta questa richiesta HTTP alla tua applicazione web.
+
+I> [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) (sta per Hyper Text 
+I> Transfer Protocol) -- un protocollo per trasferire dati da una maschera di un documento ipertestuale (pagina web). HTTP è basato sulla tecnologia client-server: il cliente inizia una connessione ed invia una richiesta al server web, e il server è in attesa di una connessione, eseguendo le necessarie azioni ed ritornando unb messagio di risposta. 
+
+Pertanto, l'obiettivo principale di qualsiasi applicazione Web è gestire la  richiesta HTTP e di produrre una risposta HTTP che in genere contiene il codice HTML della pagina web richiesta.
+
+La risposta è inviata dal server web al client, ossia il browser web, ed il browser visualizza la pagina web sullo schermo.
+ 
+Una tipica richiesta HTTP è illustrata di seguito:
+
+{line-numbers=on,lang="text",title="An HTTP request example"}
+~~~
+GET http://www.w3schools.com/ HTTP/1.1
+Host: www.w3schools.com
+Connection: keep-alive
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) 
+Accept-Encoding: gzip,deflate,sdch
+Accept-Language: en-US;q=0.8,en;q=0.6
+Cookie: __gads=ID=42213729da4df8df:T=1368250765:S=ALNI_MaOAFe3U1T9Syh; 
+(empty line)
+(message body goes here)
+~~~
+
+Il messaggio HTTP di richiesta precedente consiste di tre parti:
+
+* La riga di inizio (riga 1) specifica il metodo della richiesta (es. GET oppure POST), la stringa dell'URL ed la versione del protocollo HTTP.
+* Le intestazioni opzionali (riche 2-8) caratterizzano il messaggio, i parametri di trasmissione e forniscono altre meta informazioni.
+Nell'esempio precedente, ogni riga rappresenta una singola intestazione nella forma *nome:valore*.  
+* Il corpo opzionale del messaggio contiene i dati del messaggio. E' separato dalle intestazione con una riga vuota.
+
+Le intestazione e il corpo del messaggio possono non esserci, ma la linea di inizio è sempre presenta nella richiesta, in quanto indica la sua tipologia e l'URL. 
+
+La risposta del server per la richiesta precedente è riportata di seguito:
+
+{line-numbers=on,lang="text",title="An HTTP response example"}
+~~~
+HTTP/1.1 200 OK
+Cache-Control: private
+Content-Type: text/html
+Content-Encoding: gzip
+Vary: Accept-Encoding
+Server: Microsoft-IIS/7.5
+Set-Cookie: ASPSESSIONIDQQRBACTR=FOCCINICEFAMEKODNKIBFOJP; path=/
+X-Powered-By: ASP.NET
+Date: Sun, 04 Aug 2013 13:33:59 GMT
+Content-Length: 8434
+(empty line)
+(page content follows)
+~~~
+
+Come si può vedere dal messaggio di stato sopra riportato, la risposta HTTP 
+ha quasi la stessa forma della richiesta:
+
+* La riga di inizio (riga 1) rappresenta la versione del protocollo HTTP, il codice di stato della risposta e il messaggio (200 OK).
+
+* Intestazioni optionali (righe 2-10) forniscono diverse meta informazioni sulla risposta.
+
+* Il corpo opzionale del messaggio che segue le intestazioni, e deve essere separato dalle intestazioni da una riga vuota. Il tipico corspo del messaggio contiene il codice HTML della pagina web richeista. 
+
+## Script d'ingresso del sito
+
+Quando un server web Apache riceve una richiesta HTTP da un client browser, esegue il file *APP_DIR/public/index.php*, altrimenti chiamato lo *script d'ingresso*.
+
+I> Lo script d'ingresso è l'unico file PHP accessibile dal mondo esterno. Il server web Apache dirotta tutte le richiesta HTTP a questo script (ricordi il file *.htaccess*?). Avere questo singolo script di ingresso rende il sito web più sicuro (rispetto alla situazione in cui si abilita qualsiasi utente ad accedere a tutti i file PHP dell'applicazione).
+
+Sebbere il file *index.phpé sia molto importante, è sorprendentemente piccolo (vedi di seguito):
+
+{line-numbers=on,lang=php}
+~~~
+<?php
+
+use Zend\Mvc\Application;
+use Zend\Stdlib\ArrayUtils;
+
+/**
+ * This makes our life easier when dealing with paths. Everything is relative
+ * to the application root now.
+ */
+chdir(dirname(__DIR__));
+
+// Decline static file requests back to the PHP built-in webserver
+if (php_sapi_name() === 'cli-server') {
+    $path = realpath(__DIR__ . parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
+    if (__FILE__ !== $path && is_file($path)) {
+        return false;
+    }
+    unset($path);
+}
+
+// Composer autoloading
+include __DIR__ . '/../vendor/autoload.php';
+
+if (! class_exists(Application::class)) {
+    throw new RuntimeException(
+        "Unable to load application.\n"
+        . "- Type `composer install` if you are developing locally.\n"
+        . "- Type `vagrant ssh -c 'composer install'` if you are using Vagrant.\n"
+        . "- Type `docker-compose run zf composer install` if you are using Docker.\n"
+    );
+}
+
+// Retrieve configuration
+$appConfig = require __DIR__ . '/../config/application.config.php';
+if (file_exists(__DIR__ . '/../config/development.config.php')) {
+    $appConfig = ArrayUtils::merge($appConfig, require __DIR__ . '/../config/development.config.php');
+}
+
+// Run the application!
+Application::init($appConfig)->run();
+~~~
+
+Principalmente, ci sono tre cose da fare.
+ 
+Innanzitutto, nella riga 10, la directory corrente di lavoro è modificata in `APP_DIR`. Questo semplifica la definizione dei percorsi relativi dei file nella tua applicazione.
+
+Successivamente, nella riga 22, viene inizializzato l'autoloading della classe PHP. Questo facilita il caricanenti di qualsiasi classe che si trova nella libreria Zend Framework o nella tua applicazione senza la necessità dell'istruzione `require_once`. 
+
+Infine, nella riga 40, viene creata un'istanza della classe @`Zend\Mvc\Application`. L'applicazione viene inizializzata con le impostazioni lette dal file di configurazione *application.config.php* e l'applicazione viene eseguita.   
+
+## Eventi e cliclo di vita dell'applicazione 
+
+Come abbiamo appreso dalla sezione precedente, con ogni richiesta HTTP, si crea un oggetto @`Zend\Mvc\Application`. Normalmente, un'applicazione "vive" per un secondo o anche meno (il tempo sufficiente a generare la risposta HTTP). La vita delle applicazione consiste di diversi stadi.
+
+I> Zend Framework 3 usa il concetto di *eventp*. Una classu può *scatenare* un evento, ed altre classi possono ascoltare gli eventi. Tecnicamente, scatenare un evento significa semplicemente chiamare il metodo di "callback" di un'altra classe.
+Il gestore degli eventi è implementato all'interno del componente  @`Zend\EventManager`.
+
+Ogni stadio della vita di un applicazione è inizializzata dall'applicazione scatenando un evento (questo ecento è rappresentato dalla classe @`MvcEvent` che risiede nel namespace @`Zend\Mvc`). Altre classi (appartenenti allo Zend Framework oppure a specifica della tua applicazione) può ascoltare gli eenti e reagire di conseguenza.
+
+Di seguito vengono presentati i cinque eventi principali (fasi di vita): 
+
+**Bootstrap**. Quando viene scatenato questo evento dall'applicazione, un modulo ha la possibilità di registrarsi in ascolto dei futuri eventi dell'applicazione nel suo metodo di callback `onBootstrap()`.
+
+**Route**. Quando viene scatenato questo evento, l'URL della richiesta viene analizzato usanto la classe *rout* (tipicamente con la classe @`Zend\Router\Http\TreeRouteStack`). Se viene trovata una corrispondenza esatta tra l'URL e la rotta, la richiesta viene passata alla specifica classe *controller* del sito assegnata alla rotta.
+
+**Dispatch**. La classe controller "invia" la richiesta utilizzando il metodo d'azione corrispondente e produce i dati che possono essere visualizzati sulla pagina web.   
+
+**Render**. In questo evento, i dati prodotti dall'azione del metodo del controller vengono passati per la presentazione alla classe @`Zend\View\Renderer\PhpRenderer`. 
+La presentazione della classe usa un file *modello di visualizzazione* per la produzione della pagina HTML.
+
+**Finish**. In questo evento, la risposta HTTP viene tornata al client.
+
+Il flusso degli ecenti è illustrata in figura 3.3:
+
+
+![Figura 3.3. Flusso degli eventi durante il ciclo di vita dell'applicazione](images/operation/app_life_cycle.png)
+
+T> Sebbene sia necessario relativamente raro, alcuni pratici esempi su come ascoltare e regiare agli eventi si trova nel capitolo  [Creare di un nuovo modulo](#modules).
+
+## Configurazione dell'applicazione
+
+Molti dei componenti Zend Framework utilizzati nel tuo sito web, richiedono una configurazione (messa a punto).  Per esempio, nel file di configurazione si definiscono le credenziali per la connessione al database, specifichiamo quali moduli sono presenti nell'applicazione, e, opzionalmente, fornisce alcuni parametri personalizzati specifici dell'applicazione.
+
+La configurazione dei parametri si può definire a due livelli: a livello di applicazione oppure a livello di modulo. A livello di applicazione di solito si definiscono i parametri che controllano l'intera applicazione e sono in comune con tutti i moduli dell'applicazione. A livello di modulo, si definisco i parametri che hanno effetto solo sul modulo.
+
+I> Alcuni framework PHP preferiscono il concetto *le convenzioni al di sopra delle 
+I> configurazione*, dove la maggior parte dei parametri fortemente legati con il 
+I> codice e non richiesto configurazione. Il che rende più veloce lo sviluppo 
+I> dell'applicazione, ma la rende anche meno personalizzabile.
+I> In Zend Framework 3, viene usato il concetto *le configurazioni al di sopra delle 
+I> convenzioni* in questo modo è possibile personalizzare qualunque aspetto delle applicazioni, ma occorre impiegare molto tempo per imparare come farlo.
+
+### I file di configurazione a livello di applicazione
+
+La sottodirectory *APP_DIR/config* contiene i file di configurazione a livello di applicazione. Guardiamo questa sottodirectory in dettaglio (figura 3.4):
+
+![Figura 3.4. File di configurazione](images/operation/config.png)
+
+Il file *APP_DIR/config/application.config.php* è il file di configurazione principale. Viene usato dall'applicazione in avvio per determinare quale modulo dell'applicazione dovrà essere carico e quali servizi creare in modo predefinito.
+
+Di seguito viene mostrato il contenuto del file *application.config.php* . Si può vedere che il file di configurazione è un normale array associativo nidificato di PHP e ciascun componenete può avere una chiave specifica in questo array. Si possono fornire commenti in linea per le chiavi dell'arrai in modo da rendere più semplice agli altri la comprensione del significato di ciascuna chiave.
+
+T> Per convenzione, il nome della chiave dovrebbe essere in minuscolo, e se l nome della chiave è composto da diverse parole, le parole dovrebbero essere separata dal simbolo underscore ('_').        
+
+{line-numbers=on,lang=php, title="Content of application.config.php file"}
+~~~
+return [
+    // Retrieve list of modules used in this application.
+    'modules' => require __DIR__ . '/modules.config.php',
+
+    // These are various options for the listeners attached to the ModuleManager
+    'module_listener_options' => [
+        // This should be an array of paths in which modules reside.
+        // If a string key is provided, the listener will consider that a module
+        // namespace, the value of that key the specific path to that module's
+        // Module class.
+        'module_paths' => [
+            './module',
+            './vendor',
+        ],
+
+        // An array of paths from which to glob configuration files after
+        // modules are loaded. These effectively override configuration
+        // provided by modules themselves. Paths may use GLOB_BRACE notation.
+        'config_glob_paths' => [
+            realpath(__DIR__) . '/autoload/{{,*.}global,{,*.}local}.php',
+        ],
+
+        // Whether or not to enable a configuration cache.
+        // If enabled, the merged configuration will be cached and used in
+        // subsequent requests.
+        'config_cache_enabled' => true,
+
+        // The key used to create the configuration cache file name.
+        'config_cache_key' => 'application.config.cache',
+
+        // Whether or not to enable a module class map cache.
+        // If enabled, creates a module class map cache which will be used
+        // by in future requests, to reduce the autoloading process.
+        'module_map_cache_enabled' => true,
+
+        // The key used to create the class map cache file name.
+        'module_map_cache_key' => 'application.module.cache',
+
+        // The path in which to cache merged configuration.
+        'cache_dir' => 'data/cache/',
+
+        // Whether or not to enable modules dependency checking.
+        // Enabled by default, prevents usage of modules that depend on other modules
+        // that weren't loaded.
+        // 'check_dependencies' => true,
+    ],
+
+    // Used to create an own service manager. May contain one or more child arrays.
+    //'service_listener_options' => [
+    //     [
+    //         'service_manager' => $stringServiceManagerName,
+    //         'config_key'      => $stringConafigKey,
+    //         'interface'       => $stringOptionalInterface,
+    //         'method'          => $stringRequiredMethodName,
+    //     ],
+    // ],
+
+   // Initial configuration with which to seed the ServiceManager.
+   // Should be compatible with Zend\ServiceManager\Config.
+   // 'service_manager' => [],
+];
+~~~ 
+
+Nella riga 3 troviamo la chiave *modules* che definisce quali moduli saranno caricati in avvio. E' possibile vedere che i nomi dei moduli sono memorizzati all'interno di un altro file di configurazione `modules.config.php`, il quale elenca tutti i moduli presenti nel tuo sito web.
+
+Nella riga 11, c'è la chiave `module_paths` che indica a ZF3 le directory dove trovare i file sorgente dei moduli. I moduli dell'applicazione che sviluppi sono posizionati nella directory *APP_DIR/module*, e i moduli di terze parti possono essere posizionati nella directory *APP_DIR/vendor*.
+
+E nella riga 19 abbiamo la chiave `config_glob_paths`, che indica a ZF3 dove cercare i file di configurazione aggiuntivi. Si può vedere che i file collocati in *APP_DIR/config/autoload* che hanno il suffisso **global.php* o *local.php*, vengono caricati automaticamente.
+
+Riassumendo, normalmente userai il file principale *application.config.php* per memorizzare le informazioni sui moduli che dovrebbero essere caricati nella tua applicazione, dove sono posizionati e come devono essere caricati (per esempio, puoi controllare le opzioni di caching). In questo file puoi anche impostare il gestore dei servizi. Non è consigliabile aggiungere altre chiavi in questo file. Per questo genere di scopo è meglio usare il file `autoload/global.php`.
+
+Guadiamo adesso dentro il file `modules.config.php`. Attualmente, hai installato nel tuo sito web i seguenti moduli:
+
+{line-numbers=off,lang=php, title="Content of modules.config.php file"}
+~~~
+return [
+    'Zend\Session',
+    'Zend\Mvc\Plugin\Prg',
+    'Zend\Mvc\Plugin\Identity',
+    'Zend\Mvc\Plugin\FlashMessenger',
+    'Zend\Mvc\Plugin\FilePrg',
+    'Zend\Form',
+    'Zend\Router',
+    'Zend\Validator',
+    'Application',
+];
+~~~
+
+Il modulo `Application` è un modulo contenente i file della tua applicazione. Tutti gli altri moduli elencati sono componenti di Zend Framework.
+
+I> In ZF3, è stato introdotto uno speciale plugin di Composer denominato *component installer*. Se ricordi, nel capitolo [Applicazione Zend Skeleton](#skeleton), abbiamo risposto a yes/no a diversi quesiti dell'installazione defininendo quali componeneti installare. L'installazione ha iniettato i nomi  dei moduli di quei componenti in `modules.config.php`.
+  
+### File di configurazione aggiuntivi del livello applicazione
+
+I file di configurazione "aggiuntivi", ossia i *APP_DIR/config/autoload/global.php* e *APP_DIR/config/autoload/local.php*, definiscono a livello di applicazione, rispettivamente, i parametri ambiente agnostico e ambiente-dipendente. Questi file di configurazione sono caricati automaticamente e uniti in modo ricorsivo con i file di configurazione forniti dal modulo, questo è il motivo per il quale viene denomiato *autoload*.
+
+Avere diversi file di configurazione nella directory *APP_DIR/config/autoload*, potrebbe creare confusione sui parametri che dovrebbero essere inseriti in ognuno di essi. Ecco alcuni suggerimenti:
+
+* Usa il file *autoload/global.php* per memorizzare i parametri che nin dipendono dall'ambiente reale della macchina. Per esempio, qui possiamo memorizzare i parametri che superano i parametri predefiniti di qualche modulo. Non memorizzare qui informazioni sensibili (come le credenziali del database), a questo scopo è meglio utilizzare *autoload/local.php*.
+
+* Usa il file *autoload/local.php* per memorizzare i parametri specifici dell'ambiente reale. Per esempio, qui puoi memorizzare le credenziali del database. Di solito ogni programmatore ha un database locale quando svuluppa e verifica il sito web. In questo modo lo programmatore potrà modificare il file *local.php* ed inserirvi le sue credenziali per il database. Quando si installa il sito nel server di produzione, si potrò modificare il file `local.php` ed inserire le credenziali per il database "attivo".
+
+I> Poichè il file *autoload/local.php* contiene parametri speicidi dell'ambiente, 
+I> nel sistema di controllo di versione occorre memorizzare il suo "modello di distribuzione" 
+I> *local.php.dist*.
+I> Ogni programmatore del gruppo di lavoro rinomina il file *local.php.dist* in *local.php* e inserisce in esso i suoi parametri. Questo file *local.php* non dovrebbe essere memorizzato nel sistema di controllo di versione, in quanto potrebbe contenere informazioni sensibili come le credenziali del database (nome utente e password), e non vorresti che altri utenti le vedano.
+
+### File di configurazione di sviluppo a livello di applicazione
+
+IL file di configurazione di sviluppo a livello di applicazione (`APP_DIR/config/development.config.php`) è presente solo quando abiliti la *modalità sviluppo* (*development mode*). Se ricordi, abbiamo abilitato la modalità sviluppo in precedenza nel capitolo [Applicazione Zend Skeleton](#skeleton).
+
+I> Puoi abilitare la modalità sviluppo con il seguente comando:
+I> 
+I> `php composer.phar development-enable`
+
+Il file `development.config.php` è unito con il file principale `application.config.php`. Questo permette di sovrascrivere alcuni parametri. Per esempio puoi:
+
+  * disabilitare la configurazione di caching. Quando sviluppo il tuo sito we, modifichi frequentemente i file di configurazione, quindi la configurazione di caching potrebbe generare effetti indesiderati, come l'impossibilità di vedere subito il risultato dei cambiamenti.
+  * caricare i moduli addizionali. Per esempio, puoi caricare il modulo [ZendDeveloperTools](https://github.com/zendframework/ZendDeveloperTools) solo in modalità sviluppo.
+  
+ 
+Se disabiliti la modalità sviluppo, il file `development.config.php` verrà eliminato. Quindi non memorizzare questo ile nel sistema di controllo di versioni. Viceversa, memorizza la sua versione di *distribuzione*, `development.config.php.dist` nel sistema di controllo di versioni.
+
+### File di configurazione di sviluppo aggiuntivi a livello di applicazione
+
+I file di configurazione di sviluppo aggiuntivi a livello di applicazione (`APP_DIR/config/autoload/development.local.php`) sono presenti solo se hai abilitato la *modalità sviluppo*.
+
+Il file `development.local.php` viene unito con gli altri file di configurazione a livello di modulo. Questo permette di sovrascrivere i parametri specifici dei moduli usati solo in ambiente di sviluppo.
+
+Se diabiliti la modalità sviluppo, il file `development.local.php` viene rimosso. Non dovresti memorizzare questo file nel sistema di controllo di versione. Viceversa, memorizza la sua versione di *distribuzione* `development.local.php.dist` nel sistema di controllo di versione.
+
+### File di configurazione a livello di modulo
+
+In figura 3.4, si può vedere che il modulo *Application* che è stato reso disponibile con la tua applicazione ha il file *module.config.php*, nel quale puoi inserire i tuoi parametri specifici del modulo. Vediamo il file `module.config.php`del modulo `Application`:
+  
+{line-numbers=off,lang=php, title="module.config.php file"}
+~~~
+<?php
+namespace Application;
+
+use Zend\Router\Http\Literal;
+use Zend\Router\Http\Segment;
+use Zend\ServiceManager\Factory\InvokableFactory;
+
+return [
+    'router' => [
+        'routes' => [
+            'home' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/',
+                    'defaults' => [
+                        'controller' => Controller\IndexController::class,
+                        'action'     => 'index',
+                    ],
+                ],
+            ],
+            'application' => [
+                'type'    => Segment::class,
+                'options' => [
+                    'route'    => '/application[/:action]',
+                    'defaults' => [
+                        'controller'    => Controller\IndexController::class,
+                        'action'        => 'index',
+                    ],
+                ],
+            ],
+        ],
+    ],
+    'controllers' => [
+        'factories' => [
+            Controller\IndexController::class => InvokableFactory::class,
+        ],
+    ],
+    'view_manager' => [
+        'display_not_found_reason' => true,
+        'display_exceptions'       => true,
+        'doctype'                  => 'HTML5',
+        'not_found_template'       => 'error/404',
+        'exception_template'       => 'error/index',
+        'template_map' => [
+            'layout/layout'           => __DIR__ . '/../view/layout/layout.phtml',
+            'application/index/index' => __DIR__ . '/../view/application/index/index.phtml',
+            'error/404'               => __DIR__ . '/../view/error/404.phtml',
+            'error/index'             => __DIR__ . '/../view/error/index.phtml',
+        ],
+        'template_path_stack' => [
+            __DIR__ . '/../view',
+        ],
+    ],
+];
+~~~
+
+In questo file, registri i controller dei moduli, inserisci informazioni sulle regole di routing per mappare gli URL nei tuoi controller, registri i plugin dei controller, registri anche i modelli delle viste e i modelli degli helper (impareremo di più su questi termini in questo capito e nel prossimo).
+
+
+### Combinazioni dei file di configurazione
+
+Quando un'applicazione viene creata, il file di configurazione forniti con il modulo e i file di configurazione aggiuntivi presenti nella directory *APP_DIR/config/autoload* vengono uniti in un unico grande array nidificato, con tutti i parametri di configurazione resi disponibili per qualunue parte del sito web. In questo modo, potenzialmente, puoi sovrascrivere alcuni parametri specifici dei moduli.
+
+I> Puoi anche aver visto la "combinazione" di file di configurazione con l'installazione di PHP, dove 
+I> c'è il file principale *php.ini* e altri file aggiuntivim, che sono inclusii all'interno del 
+I> principale.  Tale separazione rende la configurazione dell'applicazione molto dettagliata e 
+I> flessibile, perché non è necessario inserire tutti i parametri in un singolo file e modificarlo ogni 
+I> volta che è necessario modificare qualcosa.
+
+I file di configurazione sono caricati nel seguente ordine: 
+
+* Il file principale *application.config.php* è caricato per primo. E' usato per inizializzare il 
+  gestore dei servizi e caricare i moduli dell'applicazione. I dati caricati da questa configurazione sono memorizzati da senza essere uniti con altri file di configurazione.
+
+* I file di configurazione per ogni modulo dell'applicazione sono carica ed uniti. I moduli sono  
+  caricati nello stesso ordine con cui sono elencati nel file *application.config.php*. Se i parametri di  due moduli sono memorizzati (intenzionalmente o per errore) con lo stesso nome di chiave, i parametri saranno sovrascritti.
+
+* I file aggiuntivi di configurazione presenti nella cartella *APP_DIR/config/autoload* sono caricati 
+  ed uniti in un singolo array. Quindi questo array viene unito con l'array di configurazione del modulo del precedente stadio, quando viene caricato il modulo di configurazione. La configurazione a livello di applicazione ha priorità più alta rispetto alla configurazione del modulo, quindi se si desidera, è possibile sovrascrivere qui le chiavi del modulo.
+  
+### Punto d'ingresso del modulo
+
+In ZF3, la tua applicazione web è composta da moduli. Per definizione, hai il solo modulo `Application`, ma se ne possono creare altri se necessario. Normalmente, i moduli creati da te vengono memorizzati nella directory *APP_DIR/module*, mentre i moduli di terze parti sono posizionati nella directory *APP_DIR/vendor*.
+
+In avvio, quando l'oggetto @`Zend\Mvc\Application` viene creato, usa il componente @`Zend\ModuleManager` per trovare e caricare tutti i moduli registrati nella configurazione dell'applicazione.
+
+Ogni modulo dell'applicazione web ha il file *Module.php* il quale è una sorta di *punto d'ingresso* per il modulo. Questo file fornisce la classe `Module`. Di seguito viene presentato il contenuto della classe `Module` dell'applicazione skeleton:
+
+{line-numbers=off, lang=php, title="Contents of Module.php file"}
+~~~
+<?php 
+namespace Application;
+
+class Module
+{
+    public function getConfig()
+    {
+        return include __DIR__ . '/../config/module.config.php';
+    }
+}
+~~~
+
+La classe `Module` appartiene allo spazio dei nomi del modulo (per il modulo principale
+appartiene al namespace `Application`).
+
+Il metodo `getConfig ()` viene in genere utilizzato per fornire la configurazione del modulo a Zend Framework (il file *module.config.php*).
+
+I> Puoi anche registrare qui alcuni *ascoltatori di eventi*, vedremo come farlo più avanti nel capito [Creating a New Module](#modules).  
+
+
+## Gestore dei servizi 
+
+Puoi immaginare l'applicazione web come un insieme di *servizi*. Ad esempio, puoi avere un servizio di autotenticazione responsabile della registrazione degli utenti nel sito, un servizio di gestione delle entità per accedere al database, altri servizi di gestione responsabili di scatenare eventi ed inviarli  agli ascoltatori di eventi, etc.
+
+In Zend Framework, la classe @`ServiceManager` è un *contenitore* centralizzato per tutti i servizi dell'applicazione. Il gestore di sercizi è implementato nel componente @`Zend\ServiceManager`, come la classe @`ServiceManager. Il diagramma dell'ereditarietà della classe è visibile in figura 3.5:
+
+![Figura 3.5. Service manager class inheritance diagram](images/operation/service_manager_inheritance.png) 
+
+Il gestore dei servizi viene creato all'avvio dell'applicazione (all'interno del metodo statico `init()` della classe  @`Zend\Mvc\Application`).
+I servizi standard disponibili attraverso il gestore dei servisi sono elencati nella tabella 3.1.
+La tabella è incompleta, in quanto al momento il numero di servizi registrati nel gestore dei serviz potrebbe essere molto grande.
+
+{title="Table 3.1. Standard services"}
+|----------------------|-----------------------------------------------------------------------|
+| Nome servizio        | Descrizione                                                           |
+|----------------------|-----------------------------------------------------------------------|
+| `Application`        | Permette di ottenere la singola istanza della classe (singleton)      | 
+|                      | @`Zend\Mvc\Application`.                                              |                      
+|----------------------|-----------------------------------------------------------------------|
+| `ApplicationConfig`  | Array di configurazione estratto dal file *application.config.php*.   |
+|----------------------|-----------------------------------------------------------------------|
+| `Config`             | Unisce l'array di configurazione estratto dal file *module.config.php*|
+|                      | unito con i file *autoload/global.php* e *autoload/local.php*.        |
+|----------------------|-----------------------------------------------------------------------|
+| `EventManager`       | Permette di ottenere una *nuova* istanza della classe                 | 
+|                      | @`Zend\EventManager\EventManager`. Il gestore degli eventi permette   |
+|                      | di inviare (scatenare) eventi e allegare gli ascoltatori dello        |
+|                      | evento.                                                               |
+|----------------------|-----------------------------------------------------------------------|
+| `SharedEventManager` | Permette di recuperare la singola istanza della classe (singleton)    |             
+|                      | @`Zend\EventManager\SharedEventManager`. Il gestore di eventi         | 
+|                      | condiviso permette l'ascolto di eventi definiti da altre classi e     |
+|                      | componenti.                                                           | 
+|----------------------|-----------------------------------------------------------------------|
+| `ModuleManager`      | Permette di recuperare la singola istanza della classe (singleton)    | 
+|                      | @`Zend\ModuleManager\ModuleManager`. Il gestore dei moduli è          |
+|                      | del caricavamento dei moduli dell'applicazione.                       |
+|----------------------|-----------------------------------------------------------------------|
+| `Request`            | Singola istanza della classe (singleton) @`Zend\Http\Request`.        |
+|                      | Rappresenta la richiesta HTTP ricevuta proveniete dal client.         |
+|----------------------|-----------------------------------------------------------------------|
+| `Response`           | Singola istanza della classe (singleton) @`Zend\Http\Response`.       |
+|                      | Rappresenta la risposta HTTP che verrà inviata al client.             |
+|----------------------|-----------------------------------------------------------------------|
+| `Router`             | Singola istanza (singleton) di @`Zend\Router\Http\TreeRouteStack`.    |
+|                      | Esegue il routing degli URL.                                          |
+|----------------------|-----------------------------------------------------------------------|
+| `ServiceManager`     | Gestore dei servizi.                                                  |
+|----------------------|-----------------------------------------------------------------------|
+| `ViewManager`        | Singola istanza della classe (singleton)                              |
+|                      | @`Zend\Mvc\View\Http\ViewManager`. Responsabile della preparazione    |
+|                      | del livello di visualizzazione per il rendering della pagina.         | 
+|----------------------|-----------------------------------------------------------------------|
+
+Un servizio è normalmente una qualunque classe PHP, ma non sempre. Per esempio, quando ZF3 carica i file di configurazione e unisce i dati negli array nidificati, salva gli array nel gestiore dei servizi come una coppia dei servizi (!): `ApplicationConfig` e `Config`.
+Il primo è l'aray caricato dal file di configurazione del livello dell'applicazione *application.config.php*, mentre l'altro è l'array formato dall'unione del file di configurazione a livello di modulo ed il file di configurazione dell'auto-caricamento a livello dell'applicazione. In questo modo, nel gestore dei servizi puoi trovare qualunque cosa tu voglia: una classe PHP, una singola variabile oppure un array.
+
+Dalla tabella 3.1, puoi vedere che in ZF3 quasi tutto può essere considerato come un servizio. Il gestore dei servizi è esso stesso registrato come servizio. Inoltre, anche la classe @`Application` è registrata come servizio.
+
+I> Un importante aspetto che avrai notato circa i servizi è che *tipicamente* si trovano in una sola singola istanza (viene anche chiamato modello *singleton*). Ovviamente, non avrai bisogno di una seconda istanza della classe @`Application` (in questo caso avresti un incubo).
+
+T> Ma, c'è un'importante exezione alla regola sopra descritta. Potrebbe confondere all'inzio, ma @`EventManager` non è singleton. Ogni volta ricavi l'evento del gestore dei servizi da quest'ultimo, ricevi un *nuovo* oggetto. Viene fatto per ragioni di prestazioni e per evuitare possibili conflitti tra i differenti componenti. Discuteremo di questo aspetto più avanti in questo capitolo nella sezione *Gestore degli eventi*.
+
+Il gestore dei servizi definisce diversi metodo necessarie per localizzare e recuperare un servizio dal gestore dei servizi (vedi di seguito la tabella 3.2). 
+
+{title="Table 3.2. ServiceManager methods"}
+|----------------------|-----------------------------------------------------------------------|
+| Nome metodo          | Descrzione                                                            |
+|----------------------|-----------------------------------------------------------------------|
+| `has($name)`         | Controlla se il servizio è registrato.                                |
+|----------------------|-----------------------------------------------------------------------|
+| `get($name)`         | Recupera l'istanza di un servizio registrato.                         |
+|----------------------|-----------------------------------------------------------------------|
+| `build($name, $options)` | Ritorna sempre una nuova istande del servizio richiesto.          |
+|----------------------|-----------------------------------------------------------------------|
+
+Puoi verificare se un servizio è stato registrato passando il suo nome al metodo `has()` del gestore dei servizi. Ritorna il boolean `true` se il servizio è registrato, oppure `false` se il servizio con quel nome non è registrato. 
+
+Successivamente puoi recuperare il servizio mediante il suo nome con l'aiuto del metodo `get()` del gestore dei servizi. Questo metodo prende un singolo parametro che rappresenta il nome del servizio. Vediamo l'esempio che segue:
+
+{line-numbers=off,lang=php}
+~~~
+<?php 
+
+// Retrieve the application config array.
+$appConfig = $serviceManager->get('ApplicationConfig');
+
+// Use it (for example, retrieve the module list).
+$modules = $appConfig['modules'];
+~~~		
+
+E il metodo `build()` crea sempre nuove istanze del servizio quando lo chiami (confrontato con `get ()`, che in genere crea l'istanza del servizio solo una volta e la restituisce su richieste successive(.
+
+T> Tipicamente recupererai i servizi dal gestore di servizi non in *qualunque* posto del tuo codice, ma all'interno di un *factory*. Un factory è un codice responsabile della creazione di un oggetto. Quando creiamo l'oggetto, è possibile recuperare i servizi da cui dipende dal gestore dei servizi e passare questi servizi (dipendenze) al costruttore dell'oggetto. Viene anche chiamato *iniezione di dipendenze* (*dependency injection*).  
+
+I> Se hai qualche esperienza con Zend Framework 2, saprai che le cose ora sono un po differenti rispetto a prima. In ZF2, c'era il modello `ServiceLocator` che consentiva di prendere le dipendenze dal gestore dei servizi in *qualunque* parte della tua applicazione (nei controller, servizi, etc.). In ZF3, puoi passare le dipendenze in modo esplicito. È un po 'più noioso, ma rimuove le dipendenze "nascoste" e rende il tuo codice più chiaro e più facile da capire.
+
+### Registrare un servizio
+
+Quando scrivi il tuo sito web, spesso dovrai registrare i tuoi servizi nel gestore dei servizi. Uno dei modi per registrare un servizio è quello di usare il metodo `setService()` del gestore dei servizi.
+Per esempio, creiamo e registriamo la classe per la conversione della valuta, la quale sarà utilizzata, pese esempio, nella pagina del carrello per convertire la valuta EUR in USD:
+
+{line-numbers=on,lang=php}
+~~~
+<?php 
+// Define a namespace where our custom service lives.
+namespace Application\Service;
+
+// Define a currency converter service class.
+class CurrencyConverter 
+{
+    // Converts euros to US dollars.
+    public function convertEURtoUSD($amount) 
+    {
+        return $amount*1.25;
+    }
+	
+    //...
+}
+~~~
+
+Sopra, nelle righe 6-15, riportiamo un esempio della classe `CurrencyConverter` (per semplicità, implementiamo solo un il singolo metodo `convertEURtoUSD()` che converte gli euro in dollari US).
+  
+{line-numbers=off,lang=php}
+~~~
+// Create an instance of the class.
+$service = new CurrencyConverter();
+// Save the instance to service manager.
+$serviceManager->setService(CurrencyConverter::class, $service);
+~~~
+
+Nell'esempio, abbiamo instanziato la classe con l'operatore `new`, e lo registriamo con il gestore dei servizi utilizzando il metodo `setService()` (assumiamo che la variabile `$serviceManager` è di tipo della classe @`Zend\ServiceManager\ServiceManager`, ed è dichiarata altrove). 
+
+Il metodo `setService()` prende due parametri: la stringa del nome del servizio, e l'istanza del servizio.
+Il nome del servizio dovrebbe essere unico tra i possibili servizi.
+
+Una volta che il servizio è messo nel gestore dei servizi, è possibile recuperarelo mediante il suo nome in qualche parte della tua applicazione con l'aiuto del medoto `get()` del gestore dei servizi. Vediamo di seguito un esempio: 
+
+{line-numbers=off,lang=php}
+~~~
+<?php 
+// Retrieve the currency converter service.
+$service = $serviceManager->get(CurrencyConverter::class);
+
+// Use it (convert money amount).
+$convertedAmount = $service->convertEURtoUSD(50);
+~~~		
+
+### Nome dei servizi
+
+Servizi diversi possono usare stili di denominazione diversi. Per esempio, lo stesso servizio di conversione di valuta può essere registrato con nomi diversi: `CurrencyConverter`,  `currency_converter` e così via. Per introdurre alcune convenzioni per uniformare la denominazione, è congliabile registrare un sevizio con il suo nome di classe completo, come segue:
+
+{line-numbers=off,lang=php}
+~~~
+$serviceManager->setService(CurrencyConverter::class);
+~~~
+
+Nell'esempio precedente, abbiamo usato la parola chiave `class`. Questa è disponible sin da PHP 5.5 ed è usata per la risoluzione dei nomi delle classi. `CurrencyConverter::class` viene esteso al nome completo della classe, come `\Application\Service\CurrencyConverter`.
+
+### Overriding di un servizio esistente
+
+Se provi a registrare il nome di un servizio che è già presente, il metodo `setService()` lancerà un'eccezione. Ma alcune volte vuoi fare l'override del servizio con lo stesso nome (per sostituirlo con uno nuovo). A questo scopo, si può usare il metodo `setAllowOverride()` del gestore dei servizi: 
+
+{line-numbers=of,lang=php}
+~~~
+<?php 
+// Allow to replace services 
+$serviceManager->setAllowOverride(true);
+
+// Save the instance to service manager. There will be no exception
+// even if there is another service with such a name.
+$serviceManager->setService(CurrencyConverter::class, $service);
+~~~
+
+Sopra, il metodo `setAllowOverride()` prende un singolo parametro booleano definendo se consentire di sostituire il servizio `CurrencyConverter` se tale nome è già presente, oppure no.
+
+### Registrazione di classi invocabili
+
+L'aspetto necativo del metodo `setService()` è che devi creare l'istanza del servizio prima che ne avrai veramente bisogno. Se non usi il servizio, l'istanza del servizi sprecherà solo tempo e memoria. Per risolvere questo aspetto, il gestore dei servizi fornisce il metodo `setInvokableClass()`. 
+
+{line-numbers=off,lang=php}
+~~~
+<?php 
+// Register an invokable class
+$serviceManager->setInvokableClass(CurrencyConverter::class);
+~~~
+
+Nell'esempio precedente, passiamo al gestore dei servizi il nome completo della classe del servizio invece di passare la sua istanza. Con questa tecnica, il servizio sarà istanziata dal gestore dei servizi solo quando qualcuno richiama il metodo `get(CurrencyConverter::class)`. Viene anche chiamato caricamento pigro (lazy loading). 
+
+T> I servizi spesso dipendono l'uno dall'altro. Per esempio, il servizio conversione di valuta puà usare l'entità gestore di servizi per leggere i tassi di cambio dal database. Lo svantaggio del metodo `setInvokableClass()` è che non consente il passaggui di parametri (dipendenze) al servizio d'instanziazione degli oggetti. Per risolvere questo aspetto, puoi usare i *factories*, come descritto di seguito.
+
+### Registrare un factory
+
+U *factory* è una classe che può fare solo una cosa - creare altri oggetti.
+
+Un factory si registra con il metodo `setFactory()` del gestore dei servizi:
+
+Il factory più semplice è @`InvokableFactory` - è analogo al metodo `setInvokableClass()` della precedente sezione.
+
+{line-numbers=off,lang=php}
+~~~
+<?php 
+use Zend\ServiceManager\Factory\InvokableFactory;
+
+// This is equivalent to the setInvokableClass() method from previous section.
+$serviceManager->setFactory(CurrencyConverter::class, InvokableFactory::class);
+~~~
+
+Dopo la registrazione il factory può recuperare il servizio dal gestore dei servi con il solito metodo `get()`. Il servizio sarà istanziato solo quando lo si recupera dal gestore dei servizi (caricamento pigro).
+
+Alle volte, istanziare il servizio è più complesso della semplice creazione dell'istanza del servizio con l'operatore `new` (come fa @`InvokableFactory`). Potrebbe essere necessario passare alcuni parametri al costruttore del servizio o invocare alcuni metodo del servizio solo dopo la 
+costruzione. Questa complessa instanziazione logica può essere incapsulata dentro la tua classe *factory*. La classe factory normalmente implementa @`FactoryInterface`[Zend\ServiceManager\Factory\FactoryInterface]:
+
+{line-numbers=off,lang=php}
+~~~
+<?php
+namespace Zend\ServiceManager\Factory;
+
+use Interop\Container\ContainerInterface;
+
+interface FactoryInterface
+{
+    public function __invoke(ContainerInterface $container, 
+                        $requestedName, array $options = null);
+}
+~~~
+
+Come abbiamo visto dalla definizione del @`FactoryInterface`[Zend\ServiceManager\Factory\FactoryInterface], la classe factory deve fornire il metodo magico `__invoke` che restituise l'istanza di un singolo servizio. Il gestore dei servizi viene passato al metodo `__invoke` come parametro `$container`; può essere usato durante la costruzione del servizio per accedere ad altri sercizi (iniettare le *dipendenze*). Il secondo argomento (`$requestedName`) è il nome del servizio. Il terzo argomento (`$options`) può essere usato per passare alcuno parametri al servizio, e è utilizzato solo quando si richiede il servizo con il metodo `build()` del gestore dei servizi.
+
+Come esempio, scriviamo una factory per il nostro servizio di conversione di valuta (vedi il codice più avanti). Non usiamo il costruttore logico complesso per il nostro servizio `CurrencyConverter`, ma per servizi più complessi, si potrebbe avere la necessità di usarne uno.
+
+{line-numbers=off,lang=php}
+~~~
+<?php 
+namespace Application\Service\Factory;
+
+use Zend\ServiceManager\Factory\FactoryInterface;
+use Application\Service\CurrencyConverter;
+
+// Factory class
+class CurrencyConverterFactory implements FactoryInterface
+{
+    public function __invoke(ContainerInterface $container, 
+                     $requestedName, array $options = null) 
+    {
+        // Create an instance of the class.
+        $service = new CurrencyConverter();	
+	
+        return $service;
+    }
+}
+~~~
+
+I> Tecnicamente, in ZF3 si *può* usare la stessa classe factory per istanziare diversi servizi che hanno il codice d'instanziazione simile (a tale scopo, è possibile utilizzare l'argomento  `$requestedName` passato al metodo `__invoke()` del factory).
+Tuttavia, *per lo più* creerai un factory diverso per ogni servizio.
+
+### Registrazione di un factory astratto
+
+Il caso più complesso di un factory è quando è necessario determinare in esecuzione quali nomi di servizi devono essere registrati. Per questo genere di situazioni, si può usare una *factory astratta*. Una classe factory astratta dovrebbe implementare l'interfacci @`AbstractFactoryInterface`[Zend\ServiceManager\Factory\AbstractFactoryInterface]: 
+
+{line-numbers=off,lang=php}
+~~~
+<?php 
+namespace Zend\ServiceManager\Factory;
+
+use Interop\Container\ContainerInterface;
+
+interface AbstractFactoryInterface extends FactoryInterface
+{
+    public function canCreate(ContainerInterface $container, $requestedName);
+}
+~~~
+
+Una factory astratta ha due metodi: `canCreate()` e `__invoke()`. 
+Il primo è necessato per verificare se il factory può creare il servizio con un certo nome, e l'altro consente di creare il servizio. I metodi prendono due parametri: i gestore del servizio (`$container`) e i nome del servizio (`$requestedName`).  
+
+Rispetto alla solita classe factory, la differenza è che la solita classe factory *tipicamente* crea solo un singolo tipo di servizio, ma un factory astratto pup creare dinamicamente tutti i tipi di servizi che si desidera. 
+
+Un factory astratto si registra con il metodo `setAbstractFactory()` del gestore del servizio.
+
+T> Le factory astratte sono una caratteristica potente, ma si dovrebbero usare solo quando è veramente necessario in quanto impattano negativamente sulle prestazioni. E' meglio usare le solite factory (non astratte).
+
+### Registrazione degli alias di servizio
+
+A volte, si vuole definire un *alias* per un servizio. L'alias è come un collegamento simbolico: referenzia il servizio già registrato. Per creare un alias, si usa il metodo `setAlias()` del gestore del servizio:
+
+{line-numbers=off,lang=php}
+~~~
+<?php 
+// Register an alias for the CurrencyConverter service
+$serviceManager->setAlias('CurConv', CurrencyConverter::class);
+~~~
+
+Una volta registrato, si può recuperare il servizio sia mediante il suo nome sia mediante l'alias usando il metodo `get()`  del gestore del servizio.
+
+### Servizi condivisi e non condivisi
+
+In modo predefinito, i servizi sono memorizzati solo in una singola istanza del gestore dei servizi. Viene anche chiamato *singleton*. Per esempio, quando provi a recuperare due volte il servizio `CurrencyConverter`, si riceverà lo stesso oggetto. Viene anche chiamato servizio *condiviso*. Ma, in alcune (rare) situazioni, sarà necessario creare una *nuova* istanza del servizio ogni volta che qualcuno lo richiede dal gestore dei servizi. Un esempio è @`EventManager` - viene presa una nuova istanza ogni volta che viene richiesto.
+
+Per segnare un servizio come non condiviso, si può usare il metodo `setShared()` del gestore del servizio: 
+
+{line-numbers=off,lang=php}
+~~~
+$serviceManager->setShared('EventManager', false);
+~~~ 
+
+### Configurazione del gestore del servizio
+
+Nel tuo sito web, solitamente utilizzi la configurazione del gestore dei servizi per registrare il tuoi servizi (invece di richiamare il metodo del gestore dei servizi descritto in precedenza).
+
+Per registrare automaticamente un servizio nel gestore dei servizi, di solito viene utilizzata la chiave `service_manager` di un file di configurazione. Si può inserire questa chiave sia all'interno della configurazione a livello di applicazione sia nel file di configurazione a livello di modulo. 
+
+W> Se si inserisce questa chiave nel file di configurazione a livello di modulo, bisogna fare 
+W> attenzione alla possibilità di sovrascrivere il nome durante l'uniione delle configurazioni. 
+W> Non registrare lo stesso nome di servizio in moduli diversi.
+
+Questa chiave `service_manager` dovrebbe apparire come di seguito:
+
+{line-numbers=on,lang=php}
+~~~
+<?php 
+return [
+    //...
+
+    // Register the services under this key
+    'service_manager' => [
+        'services' => [
+            // Register service class instances here
+            //...
+        ],
+        'invokables' => [
+            // Register invokable classes here
+            //...
+        ],
+        'factories' => [
+            // Register factories here
+            //...
+        ],
+        'abstract_factories' => [
+            // Register abstract factories here
+            //...
+        ],
+        'aliases' => [
+            // Register service aliases here
+            //...
+        ],
+        'shared' => [
+            // Specify here which services must be non-shared
+        ]
+  ],
+  
+  //...
+];
+~~~
+
+Nell'esempio precedente, si può vedere la chiave `service_manager` può contenere diverse sotto-chiavi per la registrazione dei servizi in modi diversi:
+* la sottochiave `services` (riga 7) consente la registrazione dell'istanza della classe;
+* la sottochiave `invokables` (riga 11) permete di registrare il nome completo di una classe come servizio; il servizio sarà istanziato utilizzando il caricamento pigro;
+* la sottochiave `factories` permette la registrazione di un factory, che abilita a creare istanze di un singolo servizio; 
+* `abstract_factories` (riga 19) può essere usata per registra un factory astratto, i quali abilitatno al registrare diversi servizi mediante il nome;
+* la sottochiave `aliases` (riga 23) fornisce la possibilità di registrare un alias per un servizio;
+* la sottochiave `shared` (riga 27) permette di specificare quali servizi devono essere non condivisi.
+
+Come esempio, registriamo il nostro servizio `CurrencyConverter` e creiamo il suo alias:
+ 
+{line-numbers=off,lang=php}
+~~~
+<?php 
+use Zend\ServiceManager\Factory\InvokableFactory;
+use Application\Service\CurrencyConverter;
+
+return [
+    //...
+
+    // Register the services under this key
+    'service_manager' => [
+        'factories' => [
+            // Register CurrencyConverter service.
+            CurrencyConverter::class => InvokableFactory::class
+        ],
+        'aliases' => [
+            // Register an alias for the CurrencyConverter service.
+            'CurConv' => CurrencyConverter::class
+        ],        
+  ],
+  
+  //...
+];
+~~~
+
+## Gestore dei plugin 
+
+Ora che hai capito cosa è il gestore dei servizi, non dovrebbe essere difficile imparare il convetto di *gestore dei plugin*. Un *gestore dei plugin* è quasi uguale al gestore dei servizi, ma può istanziare servizi soltato di un tipo. Essendo di tipo di plugin, un gestore di plugin può essere instanziato codificandolo all'interno della classe del gestore di plugin.
+
+Perché avresti bisogno di una cosa del genere? In realtà, in ZF3, i gestori di plugin sono ampiamente utilizzati, poiché consentono di creare un'istanza di un plug-in solo quando è necessario (ciò riduce l'utilizzo della CPU e della memoria). Esiste un gestore plugin separato per:
+  * controller (classe @`Zend\Mvc\Controller\ControllerManager`)
+  * plugin del controller (classe @`Zend\Mvc\Controller\PluginManager`)
+  * viste di helper (classe @`Zend\View\HelperPluginManager`)
+  * elementi di modulo (classe @`Zend\Form\FormElementManager\FormElementManagerV3Polyfill`)
+  * filtri (classe @`Zend\Filter\FilterPluginManager`)
+  * validatori (classe @`Zend\Validator\ValidatorPluginManager`)
+  * ed altro
+ 
+Il fatto che ogni gestore di plugin erediti dalla classe base @`Zend\ServiceManager\ServiceManager` consente a tutti i gestori di plugin di avere una configurazione simile. Ad esempio, i controller sono registrati sotto la chiave `controllers` nel file *module.config.php*, e questa chiave potrebbe avere le stesse sottochiavi:
+*services*, *invokables*, *factories*, *abstract_factories*, e *aliases*. La stessa struttura ha la chiave *view_helpers*  che viene usata per registrare le viste di helper, la chiave *controller_plugins* che è usata per registrare i plugin dei controller, e così via. 
+
+## Il gestore degli eventi
+
+T> In questa sezione, acquisiremo alcune informazioni avanzate sul gestore degli eventi. È possibile ignorare questa sezione in modo relativamente sicuro, tuttavia si dovrà fare riferimento ad essa se si prevede di implementare nel proprio sito Web alcuni listener di eventi avanzati.
+
+In precedenza in questo capito abbiamo menzionato che il ciclo di vita dell'applicazione consiste di *eventi*. Una classe può *scatenare* un evento, e altre classi possono *ascoltare* gli eventi. Tecnicamente, scatenare un evento significa chiamare un altro metodo di "callback" di una classe. La gestione degli eventi è implementata all'interno del componenente @`Zend\EventManager`.
+
+T> ZF3 (e in particolare il suo componente @`Zend\Mvc`) dipende fortemente dagli eventi per funzionare, e per questo il suo codice sorgente è una combinazione di ascoltatori di eventi abbastanza difficile da capire.
+T> Fortunatamente, nella maggior parte dei casi non si ha la necessità di capire come vengono scatenati e gestiti gli eventi internamente, occorre solo capire che cosa è un evento, quali eventi sono presenti nel ciclo di vita dell'applicazione e qual'è la differenza tra il normale *gestore di eventi* e il *gestore di eventi condivisi*.
+
+### Eventi e MvcEvent
+
+Un *evento* tecnicamente è un'istanza della classe @`Zend\EventManager\Event`.
+Un evento fondamentalmente può avere almeno le seguenti parti:
+  * *name* - identificatore univoco dell'evento;
+  * *target* - è tipicamente un puntatore all'oggetto che scatena l'evento;
+  * e *params* - argomenti specifici dell'evento passati agli ascoltatori dell'evento.
+
+E' possible creare tipi personalizzati di eventi estendendo la classe @`Event`[Zend\EventManager\Event].
+Per esempio, il componente @`Zend\Mvc`definisce il tipo di evento personalizzato chiamato @`Zend\Mvc\MvcEvent`, che estende la classe `Event` e aggiunge diverse proprietà e metodi necessapi al componente @`Zend\Mvc` per funzionare.
+ 
+### Gestore di eventi e gestore di eventi condivisi
+
+E' importante capire la differenza tra il *normale* gestore degli eventi e il gestore degli eventi *condivisi*.
+
+Il normale gestore degli eventi non memorizzato in un singleton nel gestore dei servizi. Ogni volta che si richiede il servizio @`EventManager` dal gestore dei servizi, si riceve una nuova istanza di quest'ultimo. Questo avviene per motivi di privacy e di prestazioni:
+  
+  * Si presuppone, per impostazione predefinita, che gli eventi di attivazione della classe   
+    richiederanno e salveranno da qualche parte il proprio gestore di eventi privato, perché non vuole che altre classi ascoltino automaticamente quegli eventi. Si presume che gli eventi innescati dalla classe appartengano a quella classe privatamente.
+  
+  * Se qualcuno fosse in grado di ascoltare qualsiasi evento innescato da qualsiasi classe, sarebbe  
+    un inferno per le prestazioni - sarebbero invocati troppi ascoltatori di eventi, aumentando così il tempo di caricamento della pagina. È meglio evitarlo mantenendo privati gli eventi.
+ 
+Ma, nel caso in cui qualcuno *abbia* bisogno intenzionalmente di ascoltare gli eventi degli altri, c'è  uno speciale gestore degli eventi *condiviso*. Il servizio @`SharedEventManager` è memorizzato nel gestore dei servizi come un singleton, in questo modo si può essere sicuri che chiunque avrà la stessa istanza di quest'ultimo.
+
+Con @`SharedEventManager`, è possibile agganciare un ascoltatore ad eventi privati attivati da certe classi (o più classi).
+Si specifica l'identificatore/i della classe per il quale si vuole ascoltare. Semplice!
+
+T> Alcuni pratici esempio di come ascoltaree reagire ad un evento si possono trovare nel capitolo [Creare un nuovo modulo](#modules) e [Gestione degli utenti, autenticazione & Filtrare gli accessi](#users) chapte  
+    
+## Riepilogo
+
+In questo capito abbiamo imparata un po di teoria sulle operazioni di base di un sito web bastato su ZF3.
+
+ZF3 usa i namespace di PHP e le carattareistiche di auto caricamento, semplificando lo sviluppo di applicazione che usano diversi componenti di terze parti. Composer fornisce l'autocaricamento PSR-4 per le classi collocate nei moduli della tua applicazione web.
+
+La maggior parte dei componenti di Zend Framework 3 richiede la configurazione. È possibile definire i parametri di configurazione a il livello dell'applicazione o a livello di modulo.
+
+L'obiettivo principale di molte applicazionei web è la gestione delle richieste HTTP e la produzione di una risposta HTTP normalmente contenente il codice HTML della pagina richiesta. Quando il server Apache riceve una richiesta HTTP dal client browser, esegue il file *index.php*, il quale è anche chiamato lo script di ingresso del sito. Su ogni richiesta HTTP, viene crearto l'oggetto @`Zend\Mvc\Application`, il cui "ciclo di vita" è costituito da diverse fasi (o eventi).
+
+La logica di business dell'applicazione web può anche essere considerata come un insieme di servizi. In Zend Framework 3, i gestore dei servizi è il contenutore centralizzato per tutti i servizi dell'applicazione. Un servizio è normalmente una classe PHP, ma in generale può essere una variabile o un array, se necessario.
